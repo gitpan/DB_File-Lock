@@ -1,0 +1,7 @@
+Revision history for Perl extension DB_File::Lock.
+
+0.01  Sat Jan 1 23:39:30 EST 2000
+	- original version; created by h2xs 1.19
+    - based on origional DB_Lock from http://www.davideous.com/misc/DB_Wrap.pm
+      and some helpful insight from Stas Bekman <sbekman@iil.intel.com>.
+

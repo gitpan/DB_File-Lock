@@ -1,0 +1,41 @@
+
+README
+
+DB_File::Lock version 0.01
+by David Harris <dharris@drh.net>
+
+
+WHAT DOES THIS MODULE DO?
+
+This module provides a wrapper for the DB_File module, adding locking.
+
+This is useful for applications which need to have concurrent
+access to a DB_File for two reasons: (1) you may want to save
+writing out the actual flock call before tie and after untie which
+gets old quickly. (2) you may be running in an enviornment such
+as mod_perl where the un-flocking of the lockfile must be handled
+by the DESTROY/untie mechanism to prevent a dropped lock. (see:
+http://perl.apache.org/guide/dbm.html#mod_perl_and_dbm)
+
+
+INSTALL
+
+To install the module, do the usual:
+
+   perl Makefile.PL
+   make
+   make test   (optionally set TEST_VERBOSE=1 or VERY_VERBOSE=1)
+   make install
+
+
+The test files in this module require a valid fork command.  If your
+platform does not have fork(2), then please disable testing when
+installing this module.
+
+
+___________________
+
+Copyright (c) 1999-2000 David R. Harris. All rights reserved. 
+This program is free software; you can redistribute it and/or modify it 
+under the same terms as Perl itself. 
+
