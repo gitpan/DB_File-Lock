@@ -63,13 +63,15 @@ report_result( unlink($file1) and unlink($file2_lock) );
 ## 15-22: See that flock is really getting called
 my $nonblock_write = { mode => "write", nonblocking => 1 };
 my $nonblock_read  = { mode => "read",  nonblocking => 1 };
+tie %hash1, 'DB_File::Lock', $file1, O_CREAT|O_RDWR, 0600, $DB_HASH, $nonblock_write;  # create the DB file
+untie %hash1;
 my $pid = fork();
 if ( not defined $pid ) {
 	print STDERR "fork failed: skipping tests 15-22\n";
 	$TEST_NUM += 9;
 } elsif ( not $pid ) { # child
-	report_result( tie %hash1, 'DB_File::Lock', $file1, O_CREAT|O_RDWR, 0600, $DB_HASH, $nonblock_read );
-	report_result( tie %hash2, 'DB_File::Lock', $file1, O_CREAT|O_RDWR, 0600, $DB_HASH, $nonblock_read );
+	report_result( tie %hash1, 'DB_File::Lock', $file1, O_RDWR, 0600, $DB_HASH, $nonblock_read );
+	report_result( tie %hash2, 'DB_File::Lock', $file1, O_RDWR, 0600, $DB_HASH, $nonblock_read );
 	sleep(3);
 	$TEST_NUM += 2;
 	report_result( untie %hash1 and untie %hash2 );

@@ -1,5 +1,18 @@
 Revision history for Perl extension DB_File::Lock.
 
+0.04 Fri Aug 11 09:08:48 EDT 2000
+    - Three good fixes from Robert Mathews <rmathews@excitecorp.com>.
+      (Thanks to him for submitting a patch!) In his own words:
+      (1) The first one is nothing big: test 16 fails with BerkeleyDB
+          v1.85 on solaris 5.6.  This seems to be due to the fact that
+          we're creating a database (and therefore writing to it),
+          but it's only read-locked.
+      (2) The second is that TIEHASH assumes that SUPER::TIEHASH
+          will succeed.  If it doesn't, the lockfile gets left open,
+          and DESTROY is never called to close it.
+      (3) I ran into one other issue: umask isn't restored if sysopen
+          on the lockfile fails.  Fixed that too.
+
 0.03 Wed Feb  2 11:06:08 EST 2000
     - stupid me! version 0.02 didn't ship with a Makefile.PL, only a Makefile.old.
       seems that I deleted the wrong file before taring up the archive after testing.

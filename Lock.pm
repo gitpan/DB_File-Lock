@@ -16,7 +16,7 @@ use strict;
 use vars qw($VERSION @ISA $locks);
 
 @ISA = qw(DB_File);
-$VERSION = '0.03';
+$VERSION = '0.04';
 
 use DB_File ();
 use Fcntl qw(:flock O_RDWR O_CREAT);
@@ -88,9 +88,10 @@ sub TIEHASH
 
 	my $lockfile_fh = Symbol::gensym();
 	my $saved_umask = umask(0000) if ( umask() & $lockfile_mode );
-	sysopen($lockfile_fh, $lockfile_name, O_RDWR|O_CREAT, $lockfile_mode)
-		or croak "could not open lockfile ($lockfile_name)";
+	my $open_ok = sysopen($lockfile_fh, $lockfile_name, O_RDWR|O_CREAT,
+            $lockfile_mode);
 	umask($saved_umask) if ( defined $saved_umask );
+	$open_ok or croak "could not open lockfile ($lockfile_name)";
 
 	my $flock_flags = ($mode eq "write" ? LOCK_EX : LOCK_SH) | ($nonblocking ? LOCK_NB : 0);
 	if ( not flock $lockfile_fh, $flock_flags ) {
@@ -100,6 +101,10 @@ sub TIEHASH
 	}
 
 	my $self = $package->SUPER::TIEHASH(@_);
+	if ( not $self ) {
+		close $lockfile_fh;
+		return $self;
+	}
 
 	## Store the info for the DESTROY function
 
