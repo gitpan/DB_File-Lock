@@ -1,5 +1,12 @@
 Revision history for Perl extension DB_File::Lock.
 
+0.02 Thu Jan 13 20:19:44 EST 2000
+    - much improved documentation
+    - much improved README
+    - added notes to other DB_File wrapper locking functions in POD and README
+    - fixed some incorrect assumptions about flock(2) in test.pl that ended
+      up being wrong on both Solaris and HP-UX and caused two tests to fail.
+
 0.01  Sat Jan 1 23:39:30 EST 2000
 	- original version; created by h2xs 1.19
     - based on origional DB_Lock from http://www.davideous.com/misc/DB_Wrap.pm

@@ -63,16 +63,30 @@ report_result( unlink($file1) and unlink($file2_lock) );
 ## 15-22: See that flock is really getting called
 my $nonblock_write = { mode => "write", nonblocking => 1 };
 my $nonblock_read  = { mode => "read",  nonblocking => 1 };
-report_result( tie %hash1, 'DB_File::Lock', $file1, O_CREAT|O_RDWR, 0600, $DB_HASH, $nonblock_read );
-report_result( tie %hash2, 'DB_File::Lock', $file1, O_CREAT|O_RDWR, 0600, $DB_HASH, $nonblock_read );
-report_result( not tie %hash3, 'DB_File::Lock', $file1, O_CREAT|O_RDWR, 0600, $DB_HASH, $nonblock_write );
-report_result( not defined %hash3 ); # double check and satisfy -w about %hash3
-report_result( untie %hash1 and untie %hash2 );
-report_result( tie %hash3, 'DB_File::Lock', $file1, O_CREAT|O_RDWR, 0600, $DB_HASH, $nonblock_write );
-report_result( untie %hash3 );
-report_result( unlink($file1) and unlink($file1_lock) );
+my $pid = fork();
+if ( not defined $pid ) {
+	print STDERR "fork failed: skipping tests 15-22\n";
+	$TEST_NUM += 9;
+} elsif ( not $pid ) { # child
+	report_result( tie %hash1, 'DB_File::Lock', $file1, O_CREAT|O_RDWR, 0600, $DB_HASH, $nonblock_read );
+	report_result( tie %hash2, 'DB_File::Lock', $file1, O_CREAT|O_RDWR, 0600, $DB_HASH, $nonblock_read );
+	sleep(3);
+	$TEST_NUM += 2;
+	report_result( untie %hash1 and untie %hash2 );
+	exit(0);
+} else { # parent
+	sleep(1);
+	$TEST_NUM += 2;
+	report_result( not tie %hash3, 'DB_File::Lock', $file1, O_CREAT|O_RDWR, 0600, $DB_HASH, $nonblock_write );
+	report_result( not defined %hash3 ); # double check and satisfy -w about %hash3
+	$TEST_NUM += 1;
+	report_result( wait() == $pid );
+	report_result( tie %hash3, 'DB_File::Lock', $file1, O_CREAT|O_RDWR, 0600, $DB_HASH, $nonblock_write );
+	report_result( untie %hash3 );
+	report_result( unlink($file1) and unlink($file1_lock) );
+}
 
-## 23-29: See that data can really be written
+## 24-30: See that data can really be written
 report_result( tie %hash1, 'DB_File::Lock', $file1, O_CREAT|O_RDWR, 0600, $DB_HASH, $nonblock_write );
 $hash1{a} = 1;
 $hash1{b} = 2;
