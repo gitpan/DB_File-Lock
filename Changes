@@ -1,5 +1,10 @@
 Revision history for Perl extension DB_File::Lock.
 
+0.03 Wed Feb  2 11:06:08 EST 2000
+    - stupid me! version 0.02 didn't ship with a Makefile.PL, only a Makefile.old.
+      seems that I deleted the wrong file before taring up the archive after testing.
+    - Lock.pm didn't have $VERSION set correctly.
+
 0.02 Thu Jan 13 20:19:44 EST 2000
     - much improved documentation
     - much improved README

@@ -16,7 +16,7 @@ use strict;
 use vars qw($VERSION @ISA $locks);
 
 @ISA = qw(DB_File);
-$VERSION = '0.01';
+$VERSION = '0.03';
 
 use DB_File ();
 use Fcntl qw(:flock O_RDWR O_CREAT);
