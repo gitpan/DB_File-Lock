@@ -16,11 +16,11 @@ use strict;
 use vars qw($VERSION @ISA $locks);
 
 @ISA = qw(DB_File);
-$VERSION = '0.04';
+$VERSION = '0.05';
 
 use DB_File ();
-use Fcntl qw(:flock O_RDWR O_CREAT);
-use Carp qw(croak carp verbose);
+use Fcntl qw(:flock O_RDWR O_RDONLY O_WRONLY O_CREAT);
+use Carp qw(croak carp);
 use Symbol ();
 
 # import function can't be inherited, so this magic required
@@ -33,9 +33,13 @@ sub import
 	eval " package $module; import $calling, \@imports; ";
 }
 
-sub TIEHASH
+sub _lock_and_tie
 {
 	my $package = shift;
+
+	## Grab the type of tie
+
+	my $tie_type = pop @_;
 
 	## There are two ways of passing data defined by DB_File
 
@@ -73,6 +77,18 @@ sub TIEHASH
 		croak "invalid lock_data ($lock_data)";
 	}
 
+	## Warn about opening a lockfile for writing when only locking for reading
+
+	# NOTE: This warning disabled for RECNO because RECNO seems to require O_RDWR
+	# even when opening only for reading.
+
+	carp "opening with write access when locking only for reading (use O_RDONLY to fix)"
+		if (
+			( $dbfile_data[1] && O_RDWR or $dbfile_data[1] && O_WRONLY ) # any kind of write access
+			and $mode eq "read"                                          # and opening for reading
+			and $tie_type ne "TIEARRAY"                                  # and not RECNO
+		);
+
 	## Determine the mode of the lockfile, if not given
 
 	# THEORY: if someone can read or write the database file, we must allow 
@@ -100,7 +116,9 @@ sub TIEHASH
 		croak "could not flock lockfile";
 	}
 
-	my $self = $package->SUPER::TIEHASH(@_);
+	my $self = $tie_type eq "TIEHASH"
+		? $package->SUPER::TIEHASH(@_)
+		: $package->SUPER::TIEARRAY(@_);
 	if ( not $self ) {
 		close $lockfile_fh;
 		return $self;
@@ -115,6 +133,16 @@ sub TIEHASH
 	## Return the object
 
 	return $self;
+}
+
+sub TIEHASH
+{
+	return _lock_and_tie(@_, 'TIEHASH');
+}
+
+sub TIEARRAY
+{
+	return _lock_and_tie(@_, 'TIEARRAY');
 }
 
 sub DESTROY
@@ -146,6 +174,7 @@ DB_File::Lock - Locking with flock wrapper for DB_File
 =head1 SYNOPSIS
 
  use DB_File::Lock;
+ use Fcntl qw(:flock O_RDWR O_CREAT);
 
  $locking = "read";
  $locking = "write";
@@ -156,9 +185,12 @@ DB_File::Lock - Locking with flock wrapper for DB_File
      lockfile_mode   => 0600,
  };
 
- [$X =] tie %hash,  'DB_File::Lock', [$filename, $flags, $mode, $DB_HASH], $locking;
+ [$X =] tie %hash,  'DB_File::Lock', $filename, $flags, $mode, $DB_HASH, $locking;
  [$X =] tie %hash,  'DB_File::Lock', $filename, $flags, $mode, $DB_BTREE, $locking;
  [$X =] tie @array, 'DB_File::Lock', $filename, $flags, $mode, $DB_RECNO, $locking;
+
+ # or place the DB_File arguments inside a list reference:
+ [$X =] tie %hash,  'DB_File::Lock', [$filename, $flags, $mode, $DB_HASH], $locking;
 
  ...use the same way as DB_File for the rest of the interface...
 
@@ -181,7 +213,7 @@ The alternative is to write code like:
 
 This module lets you write
 
-  tie(%db_hash, 'DB_File', $db_filename,  O_RDONLY, 0600, $DB_HASH, 'read') or die;
+  tie(%db_hash, 'DB_File::Lock', $db_filename,  O_RDONLY, 0600, $DB_HASH, 'read') or die;
   ... then read the database ...
   untie(%db_hash);
 
@@ -195,16 +227,25 @@ and therefore cause a dropped lock.
 
 =head1 USAGE DETAILS
 
+Tie to the database file by adding an additional locking argument
+to the list of arguments to be passed through to DB_File, such as:
+
+  tie(%db_hash, 'DB_File::Lock', $db_filename,  O_RDONLY, 0600, $DB_HASH, 'read');
+
+or enclose the arguments for DB_File in a list reference:
+
+  tie(%db_hash, 'DB_File::Lock', [$db_filename,  O_RDONLY, 0600, $DB_HASH], 'read');
+
 The filename used for the lockfile defaults to "$filename.lock"
 (the filename of the DB_File with ".lock" appended). Using a lockfile
 separate from the database file is recommended because it prevents weird
 interactions with the underlying database file library
 
-The additional locking argument added to the tie call, can be:
+The additional locking argument added to the tie call can be:
 
-(1) "read" -- aquires a shared lock for reading
+(1) "read" -- acquires a shared lock for reading
 
-(2) "write" -- aquires an exclusive lock for writing
+(2) "write" -- acquires an exclusive lock for writing
 
 (3) A hash with the following keys (all optional except for the "mode"):
 
@@ -242,6 +283,44 @@ from applying to this mode.
 Note: One may import the same values from DB_File::Lock as one may import
 from DB_File.
 
+=head1 GOOD LOCKING ETIQUETTE
+
+To avoid locking problems, realize that it is B<critical> that you release
+the lock as soon as possible. See the lock as a "hot potato", something
+that you must work with and get rid of as quickly as possible. See the
+sections of code where you have a lock as "critical" sections. Make sure
+that you call "untie" as soon as possible.
+
+It is often better to write:
+
+  # open database file with lock
+  # work with database
+  # lots of processing not related to database
+  # work with database
+  # close database and release lock
+
+as:
+
+  # open database file with lock
+  # work with database
+  # close database and release lock
+  
+  # lots of processing not related to database
+  
+  # open database file with lock
+  # work with database
+  # close database and release lock
+
+Also realize that when acquiring two locks at the same time, a deadlock
+situation can be caused.
+
+You can enter a deadlock situation if two processes simultaneously try to
+acquire locks on two separate databases. Each has locked only one of
+the databases, and cannot continue without locking the second. Yet this
+will never be freed because it is locked by the other process. If your
+processes all ask for their DB files in the same order, this situation
+cannot occur.
+
 =head1 OTHER LOCKING MODULES
 
 There are three locking wrappers for DB_File in CPAN right now. Each one
@@ -276,7 +355,7 @@ updates are reads are quick and simple flock locking semantics are enough.
 
 David Harris <dharris@drh.net>
 
-Helpful insight from Stas Bekman <sbekman@iil.intel.com>
+Helpful insight from Stas Bekman <stas@stason.org>
 
 =head1 SEE ALSO
 

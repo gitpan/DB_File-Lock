@@ -7,9 +7,10 @@
 # Change 1..1 below to 1..last_test_to_print .
 # (It may become useful if the test is moved to ./t subdirectory.)
 
-BEGIN { $| = 1; print "1..29\n"; }
+BEGIN { $| = 1; print "1..40\n"; }
 END {print "not ok 1\n" unless $loaded;}
-use DB_File::Lock qw( O_CREAT O_RDWR $DB_HASH );
+use DB_File::Lock qw( $DB_HASH $DB_RECNO );
+use Fcntl qw ( O_CREAT O_RDONLY O_RDWR );
 $loaded = 1;
 print "ok 1\n";
 
@@ -70,8 +71,8 @@ if ( not defined $pid ) {
 	print STDERR "fork failed: skipping tests 15-22\n";
 	$TEST_NUM += 9;
 } elsif ( not $pid ) { # child
-	report_result( tie %hash1, 'DB_File::Lock', $file1, O_RDWR, 0600, $DB_HASH, $nonblock_read );
-	report_result( tie %hash2, 'DB_File::Lock', $file1, O_RDWR, 0600, $DB_HASH, $nonblock_read );
+	report_result( tie %hash1, 'DB_File::Lock', $file1, O_RDONLY, 0600, $DB_HASH, $nonblock_read );
+	report_result( tie %hash2, 'DB_File::Lock', $file1, O_RDONLY, 0600, $DB_HASH, $nonblock_read );
 	sleep(3);
 	$TEST_NUM += 2;
 	report_result( untie %hash1 and untie %hash2 );
@@ -79,23 +80,41 @@ if ( not defined $pid ) {
 } else { # parent
 	sleep(1);
 	$TEST_NUM += 2;
-	report_result( not tie %hash3, 'DB_File::Lock', $file1, O_CREAT|O_RDWR, 0600, $DB_HASH, $nonblock_write );
+	report_result( not tie %hash3, 'DB_File::Lock', $file1, O_RDWR, 0600, $DB_HASH, $nonblock_write );
 	report_result( not defined %hash3 ); # double check and satisfy -w about %hash3
 	$TEST_NUM += 1;
 	report_result( wait() == $pid );
-	report_result( tie %hash3, 'DB_File::Lock', $file1, O_CREAT|O_RDWR, 0600, $DB_HASH, $nonblock_write );
+	report_result( tie %hash3, 'DB_File::Lock', $file1, O_RDWR, 0600, $DB_HASH, $nonblock_write );
 	report_result( untie %hash3 );
 	report_result( unlink($file1) and unlink($file1_lock) );
 }
 
 ## 24-30: See that data can really be written
-report_result( tie %hash1, 'DB_File::Lock', $file1, O_CREAT|O_RDWR, 0600, $DB_HASH, $nonblock_write );
+report_result( $X = tie %hash1, 'DB_File::Lock', $file1, O_CREAT|O_RDWR, 0600, $DB_HASH, $nonblock_write );
 $hash1{a} = 1;
-$hash1{b} = 2;
+$X->put("b", 2);
+undef $X;
 report_result( $hash1{a} == 1 and $hash1{b} == 2 );
 report_result( untie %hash1 );
-report_result( tie %hash2, 'DB_File::Lock', $file1, O_CREAT|O_RDWR, 0600, $DB_HASH, $nonblock_read );
+report_result( tie %hash2, 'DB_File::Lock', $file1, O_RDONLY, 0600, $DB_HASH, $nonblock_read );
 report_result( $hash2{a} == 1 and $hash2{b} == 2 );
 report_result( untie %hash2 );
 report_result( unlink($file1) and unlink($file1_lock) );
+
+## 31-37: Check to see that RECNO support works
+report_result( tie @array1, 'DB_File::Lock', $file1, O_CREAT|O_RDWR, 0600, $DB_RECNO, $nonblock_write );
+@array1 = (1, 2, 3, 4, 5);
+push(@array1, 6, 7, 8);
+report_result( join(":",@array1) eq "1:2:3:4:5:6:7:8" );
+report_result( untie @array1 );
+report_result( tie @array2, 'DB_File::Lock', $file1, O_RDWR, 0600, $DB_RECNO, $nonblock_read );
+report_result( join(":",@array2) eq "1:2:3:4:5:6:7:8" );
+report_result( untie @array2 );
+report_result( unlink($file1) and unlink($file1_lock) );
+
+## 38-40: Check to see that open failures are reported correctly
+report_result( not tie %hash1, 'DB_File::Lock', $file1, O_RDWR, 0600, $DB_HASH, $nonblock_write );
+report_result( untie %hash1 );
+report_result( ! unlink($file1) and unlink($file1_lock) );
+
 

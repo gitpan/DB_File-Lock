@@ -1,5 +1,18 @@
 Revision history for Perl extension DB_File::Lock.
 
+0.05 Tue Apr  9 15:14:43 EDT 2002
+    - removed use Carp qw(verbose) which was effecting other modules
+    - documentation improvements recommended by Stas Bekman <stas@stason.org>
+    - the documentation said we supported RECONO (tie for arrays) but 
+      Shlomo Yona <Shlomo.Yona@Siftology.com> pointed out the implementation
+      did not support that. Added support for RECNO.
+    - added a warning when opening a database with write access and only
+      locking it for reading. This warning disabled for RECNO because RECNO
+      seems to require O_RDWR even when opening only for reading.
+    - added test of database creation failure
+    - added test of database access through object interface
+    - added test of RECNO database creation and usage
+
 0.04 Fri Aug 11 09:08:48 EDT 2000
     - Three good fixes from Robert Mathews <rmathews@excitecorp.com>.
       (Thanks to him for submitting a patch!) In his own words:
@@ -26,7 +39,7 @@ Revision history for Perl extension DB_File::Lock.
       up being wrong on both Solaris and HP-UX and caused two tests to fail.
 
 0.01  Sat Jan 1 23:39:30 EST 2000
-	- original version; created by h2xs 1.19
+    - original version; created by h2xs 1.19
     - based on origional DB_Lock from http://www.davideous.com/misc/DB_Wrap.pm
-      and some helpful insight from Stas Bekman <sbekman@iil.intel.com>.
+      and some helpful insight from Stas Bekman <stas@stason.org>.
 
